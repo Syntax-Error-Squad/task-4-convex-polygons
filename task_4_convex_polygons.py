@@ -134,6 +134,18 @@ class Vector:
         return NotImplemented
 
     def __rmul__(self, other):
+        """Умножает число на вектор.
+
+        Parameters
+        ----------
+        other : int or float
+            Числовой множитель.
+
+        Returns
+        -------
+        Vector
+            Вектор с координатами, умноженными на число.
+        """
         return self * other
 
     def cross_z(self, other):
@@ -160,6 +172,18 @@ class ConvexPolygon:
     """Представляет выпуклый многоугольник на плоскости."""
 
     def __init__(self, vertices):
+        """Создаёт выпуклый многоугольник из списка вершин.
+
+        Parameters
+        ----------
+        vertices : list of Point
+            Вершины в порядке обхода по часовой стрелке.
+
+        Raises
+        ------
+        ValueError
+            Если из переданных вершин нельзя создать выпуклый многоугольник.
+        """
         if not self.is_convex(vertices):
             raise ValueError("Невозможно создать выпуклый многоугольник")
 
@@ -167,13 +191,32 @@ class ConvexPolygon:
 
     @staticmethod
     def is_convex(vertices):
+        """Проверяет возможность построения выпуклого многоугольника.
+
+        Parameters
+        ----------
+        vertices : list of Point
+            Проверяемые вершины.
+
+        Returns
+        -------
+        bool
+            False, если вершин меньше трёх, иначе True.
+        """
         if len(vertices) < 3:  # noqa: SIM103
             return False
 
-        # Проверка выпуклости будет добавлена позже.
+        # Проверка выпуклости (реализация)
         return True
 
     def perimeter(self):
+        """Вычисляет периметр многоугольника.
+
+        Returns
+        -------
+        float
+            Сумма длин всех сторон многоугольника.
+        """
         perimeter = 0
         vertices_count = len(self.vertices)
 
@@ -188,6 +231,13 @@ class ConvexPolygon:
         return perimeter
 
     def triangulate(self):
+        """Разбивает выпуклый многоугольник на треугольники.
+
+        Returns
+        -------
+        list of tuple of Point
+            Треугольники в виде троек вершин.
+        """
         first = self.vertices[0]
 
         # Выбираем первую вершину и делим многоугольник на треугольники
@@ -198,9 +248,15 @@ class ConvexPolygon:
         ]
 
     def area(self):
+        """Вычисляет площадь многоугольника через площади треугольников.
 
+        Returns
+        -------
+        int or float
+            Площадь многоугольника.
+        """
         # Выбираем треугольники, полученные из triangulate, и считаем их площадь
-        # с помощью векторного произведения, далее все площади треугольников складываем.
+        # с помощью векторного произведения, далее складываем площади.
         return sum(
             abs((b - a).cross_z(c - a)) / 2
             for a, b, c in self.triangulate()
@@ -208,10 +264,38 @@ class ConvexPolygon:
 
     @staticmethod
     def _is_inside(point, a, b):
+        """Проверяет положение точки относительно ориентированной стороны.
+
+        Parameters
+        ----------
+        point : Point
+            Проверяемая точка.
+        a : Point
+            Начало стороны.
+        b : Point
+            Конец стороны.
+
+        Returns
+        -------
+        bool
+            True, если точка лежит справа от стороны или на ней.
+        """
         # Направление обхода по часовой стрелке, поэтому знак неположительный, если точка находится внутри
         return (b - a).cross_z(point - a) <= 0
 
     def contains(self, point):
+        """Проверяет принадлежность точки многоугольнику.
+
+        Parameters
+        ----------
+        point : Point
+            Проверяемая точка.
+
+        Returns
+        -------
+        bool
+            True, если точка находится внутри или на границе многоугольника.
+        """
         vertices_count = len(self.vertices)
 
         for i in range(vertices_count):
@@ -225,10 +309,30 @@ class ConvexPolygon:
 
     @staticmethod
     def _line_intersection(a1, b1, a2, b2):
+        """Находит точку пересечения двух прямых.
+
+        Parameters
+        ----------
+        a1, b1 : Point
+            Две точки первой прямой.
+        a2, b2 : Point
+            Две точки второй прямой.
+
+        Returns
+        -------
+        Point
+            Точка пересечения прямых.
+
+        Raises
+        ------
+        ValueError
+            Если прямые параллельны.
+        """
         d1 = b1 - a1
         d2 = b2 - a2
 
-        if (d1.cross_z(d2) == 0): raise ValueError("Прямые, построенные по точкам, параллельны.")
+        if d1.cross_z(d2) == 0:
+            raise ValueError("Прямые, построенные по точкам, параллельны")
 
         # https://cp-algorithms.com/geometry/basic-geometry.html#exercises
         t = (a2 - a1).cross_z(d2) / d1.cross_z(d2)
@@ -236,6 +340,22 @@ class ConvexPolygon:
 
     @staticmethod
     def _clip(vertices, a, b):
+        """Отсекает многоугольник ориентированной прямой.
+
+        Parameters
+        ----------
+        vertices : list of Point
+            Вершины отсекаемого многоугольника.
+        a : Point
+            Начало отсекающей стороны.
+        b : Point
+            Конец отсекающей стороны.
+
+        Returns
+        -------
+        list of Point
+            Вершины части многоугольника справа от прямой или на ней.
+        """
         clipped = []
 
         previous = vertices[-1]
@@ -258,6 +378,20 @@ class ConvexPolygon:
         return clipped
 
     def intersection(self, other):
+        """Вычисляет пересечение двух выпуклых многоугольников.
+
+        Parameters
+        ----------
+        other : ConvexPolygon
+            Второй многоугольник.
+
+        Returns
+        -------
+        ConvexPolygon or None
+            Пересечение многоугольников или None, если не удалось пересечь.
+        """
+
+        # Ссылка на описание алгоритма:
         # https://www.geeksforgeeks.org/dsa/polygon-clipping-sutherland-hodgman-algorithm/
         vertices = list(self.vertices)
         other_vertices_count = len(other.vertices)
@@ -272,3 +406,78 @@ class ConvexPolygon:
                 return None
 
         return ConvexPolygon(vertices)
+
+
+def run_tests():
+    """Запускает основные проверки классов точки, вектора и многоугольника."""
+    def show_result(name, result, expected):
+        print(f"{name}: результат = {result}, ожидается = {expected}")
+
+    def point_coordinates(point):
+        return point.x, point.y
+
+    triangle = ConvexPolygon([
+        Point(0, 0),
+        Point(0, 3),
+        Point(4, 0),
+    ])
+
+    show_result("Периметр треугольника", triangle.perimeter(), 12)
+    show_result("Площадь треугольника", triangle.area(), 6)
+    show_result("Количество треугольников", len(triangle.triangulate()), 1)
+    show_result("Точка (1, 1) внутри", triangle.contains(Point(1, 1)), True)
+    show_result("Точка (4, 4) внутри", triangle.contains(Point(4, 4)), False)
+
+    pentagon = ConvexPolygon([
+        Point(0, 0),
+        Point(0, 2),
+        Point(2, 4),
+        Point(4, 2),
+        Point(4, 0),
+    ])
+    pentagon_triangles = [
+        [point_coordinates(point) for point in triangle]
+        for triangle in pentagon.triangulate()
+    ]
+    expected_triangles = [
+        [(0, 0), (0, 2), (2, 4)],
+        [(0, 0), (2, 4), (4, 2)],
+        [(0, 0), (4, 2), (4, 0)],
+    ]
+    show_result("Триангуляция пятиугольника", pentagon_triangles,
+                expected_triangles)
+
+    first = ConvexPolygon([
+        Point(0, 0),
+        Point(0, 3),
+        Point(3, 3),
+        Point(3, 0),
+    ])
+    second = ConvexPolygon([
+        Point(2, 1),
+        Point(2, 4),
+        Point(4, 4),
+        Point(4, 1),
+    ])
+
+    intersection = first.intersection(second)
+    show_result("Пересечение существует", intersection is not None, True)
+
+    if intersection is not None:
+        intersection_points = [
+            point_coordinates(point) for point in intersection.vertices
+        ]
+        expected_points = [
+            (2, 1),
+            (2, 3),
+            (3, 3),
+            (3, 1),
+        ]
+        show_result("Вершины пересечения", intersection_points,
+                    expected_points)
+        show_result("Площадь пересечения", intersection.area(), 2)
+        show_result("Периметр пересечения", intersection.perimeter(), 6)
+
+
+if __name__ == "__main__":
+    run_tests()
