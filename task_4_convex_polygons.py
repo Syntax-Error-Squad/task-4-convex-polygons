@@ -1,5 +1,6 @@
 import math
 from numbers import Real
+from random import triangular
 
 
 class Point:
@@ -136,8 +137,8 @@ class Vector:
     def __rmul__(self, other):
         return self * other
 
-    def cross(self, other):
-        """Вычисляет векторное произведение двух векторов на плоскости.
+    def cross_z(self, other):
+        """Вычисляет ориентированную длину векторного произведения вдоль оси Z.
 
         Parameters
         ----------
@@ -147,8 +148,9 @@ class Vector:
         Returns
         -------
         int or float
-            Псевдоскалярное произведение векторов. Его знак определяет
-            направление поворота от текущего вектора к вектору other.
+            Компонента векторного произведения по оси Z. Модуль значения
+            равен длине результирующего вектора, а знак задаёт его направление
+            вдоль оси Z.
         """
         if not isinstance(other, Vector):
             raise TypeError("other должен быть Vector")
@@ -187,10 +189,23 @@ class ConvexPolygon:
         return perimeter
 
     def triangulate(self):
-        ...
+        first = self.vertices[0]
+
+        # Выбираем первую вершину и делим многоугольник на треугольники
+        # последовательным обходом.
+        return [
+            (first, self.vertices[i], self.vertices[i + 1])
+            for i in range(1, len(self.vertices) - 1)
+        ]
 
     def area(self):
-        ...
+
+        # Выбираем треугольники, полученные из triangulate и считаем их площадь
+        # с помощью векторного произведения
+        return sum(
+            abs((b - a).cross_z(c - a)) / 2
+            for a, b, c in self.triangulate()
+        )
 
     def contains(self, point):
         ...
