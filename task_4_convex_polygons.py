@@ -1,6 +1,5 @@
 import math
 from numbers import Real
-from random import triangular
 
 
 class Point:
@@ -200,15 +199,76 @@ class ConvexPolygon:
 
     def area(self):
 
-        # Выбираем треугольники, полученные из triangulate и считаем их площадь
-        # с помощью векторного произведения
+        # Выбираем треугольники, полученные из triangulate, и считаем их площадь
+        # с помощью векторного произведения, далее все площади треугольников складываем.
         return sum(
             abs((b - a).cross_z(c - a)) / 2
             for a, b, c in self.triangulate()
         )
 
+    @staticmethod
+    def _is_inside(point, a, b):
+        # Направление обхода по часовой стрелке, поэтому знак неположительный, если точка находится внутри
+        return (b - a).cross_z(point - a) <= 0
+
     def contains(self, point):
-        ...
+        vertices_count = len(self.vertices)
+
+        for i in range(vertices_count):
+            a = self.vertices[i]
+            b = self.vertices[(i + 1) % vertices_count]
+
+            if not self._is_inside(point, a, b):
+                return False
+
+        return True
+
+    @staticmethod
+    def _line_intersection(a1, b1, a2, b2):
+        d1 = b1 - a1
+        d2 = b2 - a2
+
+        if (d1.cross_z(d2) == 0): raise ValueError("Прямые, построенные по точкам, параллельны.")
+
+        # https://cp-algorithms.com/geometry/basic-geometry.html#exercises
+        t = (a2 - a1).cross_z(d2) / d1.cross_z(d2)
+        return a1 + d1 * t
+
+    @staticmethod
+    def _clip(vertices, a, b):
+        clipped = []
+
+        previous = vertices[-1]
+        previous_inside = ConvexPolygon._is_inside(previous, a, b)
+
+        for current in vertices:
+            current_inside = ConvexPolygon._is_inside(current, a, b)
+
+            if previous_inside != current_inside:
+                clipped.append(
+                    ConvexPolygon._line_intersection(previous, current, a, b)
+                )
+
+            if current_inside:
+                clipped.append(current)
+
+            previous = current
+            previous_inside = current_inside
+
+        return clipped
 
     def intersection(self, other):
-        ...
+        # https://www.geeksforgeeks.org/dsa/polygon-clipping-sutherland-hodgman-algorithm/
+        vertices = list(self.vertices)
+        other_vertices_count = len(other.vertices)
+
+        for i in range(other_vertices_count):
+            a = other.vertices[i]
+            b = other.vertices[(i + 1) % other_vertices_count]
+
+            vertices = self._clip(vertices, a, b)
+
+            if len(vertices) < 3:
+                return None
+
+        return ConvexPolygon(vertices)
