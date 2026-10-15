@@ -156,22 +156,30 @@ class ConvexPolygon:
     """Представляет выпуклый многоугольник на плоскости."""
 
     def __init__(self, vertices):
+        if not self.is_convex(vertices):
+            raise ValueError("Невозможно создать выпуклый многоугольник")
+
         self.vertices = vertices
 
-    def is_convex(self):
+    @staticmethod
+    def is_convex(vertices):
+        if len(vertices) < 3: # noqa: SIM103
+            return False
+
+        # Проверка выпуклости будет добавлена позже.
+        return True
+
+    def perimeter(self):
+        ...
+
+    def triangulate(self):
         ...
 
     def area(self):
-        ...
-
-    def perimeter(self):
         ...
 
     def contains(self, point):
         ...
 
     def intersection(self, other):
-        ...
-
-    def triangulate(self):
         ...
