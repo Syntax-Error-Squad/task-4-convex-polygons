@@ -133,6 +133,9 @@ class Vector:
             return Vector(self.x * other, self.y * other)
         return NotImplemented
 
+    def __rmul__(self, other):
+        return self * other
+
     def cross(self, other):
         """Вычисляет векторное произведение двух векторов на плоскости.
 
@@ -148,7 +151,7 @@ class Vector:
             направление поворота от текущего вектора к вектору other.
         """
         if not isinstance(other, Vector):
-            return NotImplemented
+            raise TypeError("other должен быть Vector")
         return self.x * other.y - self.y * other.x
 
 
@@ -159,18 +162,29 @@ class ConvexPolygon:
         if not self.is_convex(vertices):
             raise ValueError("Невозможно создать выпуклый многоугольник")
 
-        self.vertices = vertices
+        self.vertices = tuple(vertices)
 
     @staticmethod
     def is_convex(vertices):
-        if len(vertices) < 3: # noqa: SIM103
+        if len(vertices) < 3:  # noqa: SIM103
             return False
 
         # Проверка выпуклости будет добавлена позже.
         return True
 
     def perimeter(self):
-        ...
+        perimeter = 0
+        vertices_count = len(self.vertices)
+
+        for i in range(vertices_count):
+            current_point = self.vertices[i]
+            next_point = self.vertices[(i + 1) % vertices_count]
+
+            # Разность соседних точек задаёт вектор стороны.
+            # Для последней точки следующей становится первая, замыкая контур.
+            perimeter += (next_point - current_point).length()
+
+        return perimeter
 
     def triangulate(self):
         ...
