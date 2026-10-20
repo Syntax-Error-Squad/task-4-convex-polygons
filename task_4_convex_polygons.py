@@ -191,36 +191,40 @@ class ConvexPolygon:
 
     @staticmethod
     def is_convex(vertices):
-        """Проверяет возможность построения выпуклого многоугольника.
+        """Проверяет, задают ли вершины выпуклый многоугольник.
 
         Parameters
         ----------
         vertices : list of Point
-            Проверяемые вершины.
+            Вершины в порядке обхода по часовой стрелке.
 
         Returns
         -------
         bool
-            False, если вершин меньше трёх, иначе True.
+            True, если вершины задают невырожденный выпуклый многоугольник.
         """
         n = len(vertices)
-        if n < 3:  # noqa: SIM103
+        if n < 3:
             return False
 
+        has_turn = False
+        total_angle = 0
         for i in range(n):
             p1 = vertices[i]
-            p2 = vertices[(i+1)%n]
-            p3 = vertices[(i+2)%n]
+            p2 = vertices[(i + 1) % n]
+            p3 = vertices[(i + 2) % n]
 
-            v1 = p2-p1
-            v2 = p3-p2
+            v1 = p2 - p1
+            v2 = p3 - p2
 
-            if v1.cross_z(v2) > 1e-9:
+            cross = v1.cross_z(v2)
+            if cross > 1e-9:
                 return False
+            if cross < -1e-9:
+                has_turn = True
+            total_angle += math.atan2(cross, v1 * v2)
 
-
-        # Проверка выпуклости (реализация)
-        return True
+        return has_turn and abs(total_angle + 2 * math.pi) < 1e-6
 
     def perimeter(self):
         """Вычисляет периметр многоугольника.
@@ -418,7 +422,10 @@ class ConvexPolygon:
             if len(vertices) < 3:
                 return None
 
-        return ConvexPolygon(vertices)
+        try:
+            return ConvexPolygon(vertices)
+        except ValueError:
+            return None
 
 
 def run_tests():
