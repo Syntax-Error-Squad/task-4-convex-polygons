@@ -203,8 +203,21 @@ class ConvexPolygon:
         bool
             False, если вершин меньше трёх, иначе True.
         """
-        if len(vertices) < 3:  # noqa: SIM103
+        n = len(vertices)
+        if n < 3:  # noqa: SIM103
             return False
+
+        for i in range(n):
+            p1 = vertices[i]
+            p2 = vertices[(i+1)%n]
+            p3 = vertices[(i+2)%n]
+
+            v1 = p2-p1
+            v2 = p3-p2
+
+            if v1.cross_z(v2) > 1e-9:
+                return False
+
 
         # Проверка выпуклости (реализация)
         return True
@@ -416,6 +429,17 @@ def run_tests():
     def point_coordinates(point):
         return point.x, point.y
 
+    print("Проверка is_convex")
+    print()
+    good_triangle = [Point(0,0), Point(0,3), Point(4,0)]
+    print(f"Правильный треугольник: {ConvexPolygon.is_convex(good_triangle)}, ожидается: True")
+    bad_triangle = [Point(0,0), Point(4,0), Point(0,3)]
+    print(f"Прротив часовой стрелки: {ConvexPolygon.is_convex(bad_triangle)}, ожидается: False")
+    star_trek_badge = [Point(0,0), Point(0,4), Point(1,2), Point(4,0)]
+    print(f"Невыпуклая фигура: {ConvexPolygon.is_convex(star_trek_badge)}, ожидается: False")
+    too_short = [Point(0,0), Point(1,1)]
+    print(f"Меньше 3 вершин: {ConvexPolygon.is_convex(too_short)}, ожидается: False")
+    print()
     triangle = ConvexPolygon([
         Point(0, 0),
         Point(0, 3),
