@@ -1,6 +1,8 @@
 import math
 from numbers import Real
 
+EPS = 1e-9
+
 
 class Point:
     """Представляет точку на плоскости."""
@@ -17,6 +19,10 @@ class Point:
         """
         self.x = x
         self.y = y
+
+    def __repr__(self):
+        """Возвращает строковое представление точки."""
+        return f"Point({self.x}, {self.y})"
 
     def __sub__(self, other):
         """Вычитает одну точку из другой.
@@ -177,54 +183,136 @@ class ConvexPolygon:
         Parameters
         ----------
         vertices : list of Point
-            Вершины в порядке обхода по часовой стрелке.
+            Вершины в порядке обхода по часовой или против часовой стрелки.
 
         Raises
         ------
         ValueError
             Если из переданных вершин нельзя создать выпуклый многоугольник.
         """
+        vertices = list(vertices)
         if not self.is_convex(vertices):
             raise ValueError("Невозможно создать выпуклый многоугольник")
 
+        # Остальные методы рассчитаны на обход по часовой стрелке,
+        # поэтому вершины, заданные против часовой, разворачиваются.
+        if self._signed_area(vertices) > 0:
+            vertices.reverse()
+
         self.vertices = tuple(vertices)
+
+    @staticmethod
+    def _signed_area(vertices):
+        """Вычисляет ориентированную площадь многоугольника.
+
+        Parameters
+        ----------
+        vertices : list of Point
+            Вершины многоугольника.
+
+        Returns
+        -------
+        float
+            Положительное значение при обходе против часовой стрелки,
+            отрицательное при обходе по часовой.
+        """
+        first = vertices[0]
+        return sum(
+            (vertices[i] - first).cross_z(vertices[i + 1] - first)
+            for i in range(1, len(vertices) - 1)
+        ) / 2
+
+    @staticmethod
+    def _segments_cross(a1, a2, b1, b2):
+        """Проверяет, пересекаются ли два отрезка во внутренней точке.
+
+        Касание концами и наложение отрезков на одной прямой
+        пересечением не считаются.
+
+        Parameters
+        ----------
+        a1, a2 : Point
+            Концы первого отрезка.
+        b1, b2 : Point
+            Концы второго отрезка.
+
+        Returns
+        -------
+        bool
+            True, если отрезки пересекаются.
+        """
+        d1 = (a2 - a1).cross_z(b1 - a1)
+        d2 = (a2 - a1).cross_z(b2 - a1)
+        d3 = (b2 - b1).cross_z(a1 - b1)
+        d4 = (b2 - b1).cross_z(a2 - b1)
+
+        # Отрезки пересекаются, если концы каждого лежат строго
+        # по разные стороны от прямой, содержащей другой.
+        a_splits_b = (d1 > EPS and d2 < -EPS) or (d1 < -EPS and d2 > EPS)
+        b_splits_a = (d3 > EPS and d4 < -EPS) or (d3 < -EPS and d4 > EPS)
+        return a_splits_b and b_splits_a
 
     @staticmethod
     def is_convex(vertices):
         """Проверяет, задают ли вершины выпуклый многоугольник.
 
+        Многоугольник выпуклый, если:
+        1. все ненулевые повороты имеют одинаковое направление
+           (все по часовой стрелке или все против);
+        2. хотя бы один поворот ненулевой, то есть вершины
+           не лежат на одной прямой;
+        3. никакие несмежные стороны не пересекаются.
+
         Parameters
         ----------
         vertices : list of Point
-            Вершины в порядке обхода по часовой стрелке.
+            Вершины в порядке обхода по часовой или против часовой стрелки.
 
         Returns
         -------
         bool
-            True, если вершины задают невырожденный выпуклый многоугольник.
+            True, если вершины задают выпуклый многоугольник.
         """
         n = len(vertices)
         if n < 3:
             return False
 
-        has_turn = False
-        total_angle = 0
+        # 1-2. Все повороты в одну сторону и хотя бы один ненулевой.
+        sign = None
         for i in range(n):
             p1 = vertices[i]
             p2 = vertices[(i + 1) % n]
             p3 = vertices[(i + 2) % n]
 
-            v1 = p2 - p1
-            v2 = p3 - p2
+            cross = (p2 - p1).cross_z(p3 - p2)
+            if abs(cross) < EPS:
+                continue
 
-            cross = v1.cross_z(v2)
-            if cross > 1e-9:
+            current_positive = cross > 0
+            if sign is None:
+                sign = current_positive
+            elif current_positive != sign:
                 return False
-            if cross < -1e-9:
-                has_turn = True
-            total_angle += math.atan2(cross, v1 * v2)
 
-        return has_turn and abs(total_angle + 2 * math.pi) < 1e-6
+        if sign is None:
+            return False
+
+        # 3. Несмежные стороны не пересекаются (отсекает звёзды).
+        for i in range(n):
+            a1 = vertices[i]
+            a2 = vertices[(i + 1) % n]
+
+            for j in range(i + 2, n):
+                if (j + 1) % n == i:
+                    continue
+
+                b1 = vertices[j]
+                b2 = vertices[(j + 1) % n]
+
+                if ConvexPolygon._segments_cross(a1, a2, b1, b2):
+                    return False
+
+        return True
 
     def perimeter(self):
         """Вычисляет периметр многоугольника.
@@ -297,7 +385,8 @@ class ConvexPolygon:
         bool
             True, если точка лежит справа от стороны или на ней.
         """
-        # Направление обхода по часовой стрелке, поэтому знак неположительный, если точка находится внутри
+        # Вершины хранятся по часовой стрелке, поэтому для точки внутри
+        # знак векторного произведения неположительный.
         return (b - a).cross_z(point - a) <= 0
 
     def contains(self, point):
@@ -348,7 +437,7 @@ class ConvexPolygon:
         d1 = b1 - a1
         d2 = b2 - a2
 
-        if d1.cross_z(d2) == 0:
+        if abs(d1.cross_z(d2)) < EPS:
             raise ValueError("Прямые, построенные по точкам, параллельны")
 
         # https://cp-algorithms.com/geometry/basic-geometry.html#exercises
@@ -440,12 +529,22 @@ def run_tests():
     print()
     good_triangle = [Point(0,0), Point(0,3), Point(4,0)]
     print(f"Правильный треугольник: {ConvexPolygon.is_convex(good_triangle)}, ожидается: True")
-    bad_triangle = [Point(0,0), Point(4,0), Point(0,3)]
-    print(f"Прротив часовой стрелки: {ConvexPolygon.is_convex(bad_triangle)}, ожидается: False")
+    ccw_triangle = [Point(0,0), Point(4,0), Point(0,3)]
+    print(f"Против часовой стрелки: {ConvexPolygon.is_convex(ccw_triangle)}, ожидается: True")
     star_trek_badge = [Point(0,0), Point(0,4), Point(1,2), Point(4,0)]
     print(f"Невыпуклая фигура: {ConvexPolygon.is_convex(star_trek_badge)}, ожидается: False")
     too_short = [Point(0,0), Point(1,1)]
     print(f"Меньше 3 вершин: {ConvexPolygon.is_convex(too_short)}, ожидается: False")
+    collinear = [Point(0,0), Point(1,1), Point(2,2)]
+    print(f"Точки на одной прямой: {ConvexPolygon.is_convex(collinear)}, ожидается: False")
+    asymmetric_star = [Point(0,0), Point(2,3), Point(4,0), Point(2,0), Point(4,2)]
+    print(f"Звезда (самопересечение): {ConvexPolygon.is_convex(asymmetric_star)}, ожидается: False")
+    print()
+
+    ccw_square = ConvexPolygon([Point(0,0), Point(2,0), Point(2,2), Point(0,2)])
+    show_result("Квадрат против часовой: точка (1, 1) внутри",
+                ccw_square.contains(Point(1, 1)), True)
+    show_result("Квадрат против часовой: площадь", ccw_square.area(), 4)
     print()
     triangle = ConvexPolygon([
         Point(0, 0),
